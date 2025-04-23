@@ -1,3 +1,6 @@
+package org.example.project
+
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -5,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.multiplatform.webview.web.WebView
@@ -23,24 +27,27 @@ fun main() = application {
         var downloading by remember { mutableStateOf(0F) }
         var initialized by remember { mutableStateOf(false) }
         val download: Download = remember { Builder().github().build() }
-        val state = rememberWebViewState("http://localhost:8081/realms/spotting_station/protocol/openid-connect/auth?client_id=spotchecker-webfrontend&response_type=code")
+        val state = rememberWebViewState("https://google.com")
 
 
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 KCEF.init(builder = {
-                    installDir(File("kcef-bundle"))-
+                    installDir(File("kcef-bundle"))
 
-                    progress {
-                        onDownloading {
-                            downloading = max(it, 0F)
-                        }
-                        onInitialized {
-                            initialized = true
-                        }
-                    }
+                            progress {
+                                onDownloading {
+                                    println("Downloading KCEF: $it")
+                                    downloading = max(it, 0F)
+                                }
+                                onInitialized {
+                                    println(File("kcef-bundle").listFiles()?.joinToString("\n") { file -> file.absolutePath })
+                                    initialized = true
+                                }
+                            }
                     settings {
                         cachePath = File("cache").absolutePath
+                        windowlessRenderingEnabled = false
                     }
 
                     download(download)
@@ -56,7 +63,7 @@ fun main() = application {
             Text(text = "Restart required.")
         } else {
             if (initialized) {
-                WebView(state)
+                WebView(state, modifier = Modifier.fillMaxSize())
             } else {
                 Text(text = "Downloading $downloading%")
             }

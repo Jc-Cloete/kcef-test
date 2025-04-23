@@ -45,3 +45,5 @@ bin/
 .DS_Store
 /kcef-bundle/
 /cache/
+/composeApp/cache/
+/composeApp/kcef-bundle/
