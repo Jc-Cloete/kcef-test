@@ -59,3 +59,18 @@ compose.desktop {
         )
     }
 }
+
+afterEvaluate {
+    tasks.withType<JavaExec> {
+        jvmArgs(
+            "--add-opens", "java.desktop/sun.awt=ALL-UNNAMED",
+            "--add-opens", "java.desktop/java.awt.peer=ALL-UNNAMED",
+            "--add-opens", "java.desktop/sun.lwawt=ALL-UNNAMED",
+            "--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+            "--add-exports", "java.desktop/sun.awt=ALL-UNNAMED",
+            "--add-exports", "java.desktop/java.awt.peer=ALL-UNNAMED",
+            "--add-exports", "java.desktop/sun.lwawt=ALL-UNNAMED",
+            "--add-exports", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED"
+        )
+    }
+}
