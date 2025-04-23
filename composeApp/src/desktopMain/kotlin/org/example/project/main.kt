@@ -16,10 +16,10 @@ import com.multiplatform.webview.web.rememberWebViewState
 import dev.datlag.kcef.KCEF
 import dev.datlag.kcef.KCEFBuilder.Download
 import dev.datlag.kcef.KCEFBuilder.Download.Builder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 fun main() = application {
     Window(onCloseRequest = ::exitApplication) {
@@ -29,11 +29,16 @@ fun main() = application {
         val download: Download = remember { Builder().github().build() }
         val state = rememberWebViewState("https://google.com")
 
+        // print all jvm args
+        println("----- JVM ARGS -----")
+        System.getProperties().forEach { key, value -> println("$key: $value") }
+        println("----- JVM ARGS -----")
 
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
-                KCEF.init(builder = {
-                    installDir(File("kcef-bundle"))
+                KCEF.init(
+                        builder = {
+                            installDir(File("kcef-bundle"))
 
                             progress {
                                 onDownloading {
@@ -41,21 +46,25 @@ fun main() = application {
                                     downloading = max(it, 0F)
                                 }
                                 onInitialized {
-                                    println(File("kcef-bundle").listFiles()?.joinToString("\n") { file -> file.absolutePath })
+                                    println(
+                                            File("kcef-bundle").listFiles()?.joinToString("\n") {
+                                                    file ->
+                                                file.absolutePath
+                                            }
+                                    )
                                     initialized = true
                                 }
                             }
-                    settings {
-                        cachePath = File("cache").absolutePath
-                        windowlessRenderingEnabled = false
-                    }
+                            settings {
+                                cachePath = File("cache").absolutePath
+                                windowlessRenderingEnabled = false
+                            }
 
-                    download(download)
-                }, onError = {
-                    it?.printStackTrace()
-                }, onRestartRequired = {
-                    restartRequired = true
-                })
+                            download(download)
+                        },
+                        onError = { it?.printStackTrace() },
+                        onRestartRequired = { restartRequired = true }
+                )
             }
         }
 
@@ -69,10 +78,6 @@ fun main() = application {
             }
         }
 
-        DisposableEffect(Unit) {
-            onDispose {
-                KCEF.disposeBlocking()
-            }
-        }
+        DisposableEffect(Unit) { onDispose { KCEF.disposeBlocking() } }
     }
 }
