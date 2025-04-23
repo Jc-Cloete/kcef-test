@@ -17,7 +17,11 @@ import dev.datlag.kcef.KCEF
 import dev.datlag.kcef.KCEFBuilder.Download
 import dev.datlag.kcef.KCEFBuilder.Download.Builder
 import java.io.File
+import java.lang.ModuleLayer
+import java.lang.management.ManagementFactory
+import kotlin.jvm.java
 import kotlin.math.max
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -29,101 +33,128 @@ fun main() = application {
         val download: Download = remember { Builder().github().build() }
         val state = rememberWebViewState("https://google.com")
 
-        // print system properties (JVM args)
-        println("----- SYSTEM PROPERTIES -----")
-
-        System.getProperties().forEach { key, value -> println("$key: $value") }
-
-        println("----- END SYSTEM PROPERTIES -----")
-
-        // print JVM input arguments
-        println("----- JVM INPUT ARGUMENTS -----")
-
-        java.lang.management.ManagementFactory.getRuntimeMXBean().inputArguments.forEach(::println)
-
-        println("----- END JVM INPUT ARGUMENTS -----")
-
-        // check module descriptor for java.awt.Button
-        println("----- MODULE DESCRIPTOR FOR java.awt.Button -----")
-        val awtButtonModule = Class.forName("java.awt.Button").module
-
-        println("java.awt.Button → module: ${awtButtonModule.name}")
-
-        awtButtonModule.descriptor.exports().filter { it.source() == "sun.awt" }.forEach {
-            println("export from descriptor: ${it.source()} -> ${it.targets()}")
+        // 0) Catch anything you missed
+        Thread.setDefaultUncaughtExceptionHandler { t, ex ->
+            println("***** UNCAUGHT EXCEPTION in thread ${t.name} *****")
+            ex.printStackTrace()
         }
 
-        println("----- END MODULE DESCRIPTOR FOR java.awt.Button -----")
-
-        // try loading AWTAccessor via try/catch
-        println("----- TRY LOADING AWTAccessor -----")
-        try {
-            Class.forName("sun.awt.AWTAccessor").also {
-                println("✅ AWTAccessor loaded in module: ${it.module.name}")
-            }
-        } catch (iae: IllegalAccessError) {
-            iae.printStackTrace()
-            println("❌ Failed to access in module: ${iae.stackTrace.firstOrNull()?.moduleName}")
+        // 1) System props
+        runCatching {
+            println(">>> SYSTEM PROPERTIES")
+            System.getProperties().forEach { k, v -> println("$k = $v") }
         }
+                .onFailure { it.printStackTrace() }
 
-        println("----- END TRY LOADING AWTAccessor -----")
-
-        println("----- OS AND JAVA VERSION DETAILS -----")
-        // print OS and Java version details
-        println("os.name:        ${System.getProperty("os.name")}")
-
-        println("java.vm.name:   ${System.getProperty("java.vm.name")}")
-
-        println("java.version:   ${System.getProperty("java.version")}")
-
-        println("----- END OS AND JAVA VERSION DETAILS -----")
-
-        // list module readers of java.desktop
-        println("----- MODULE READERS OF java.desktop -----")
-
-        val javaDesktopModule = Class.forName("java.awt.Component").module
-
-        ModuleLayer.boot().modules().filter { it.canRead(javaDesktopModule) }.forEach {
-            println("  ${it.name}")
+        // 2) JVM args
+        runCatching {
+            println(">>> JVM INPUT ARGUMENTS")
+            ManagementFactory.getRuntimeMXBean().inputArguments.forEach(::println)
         }
+                .onFailure { it.printStackTrace() }
 
-        println("----- END MODULE READERS OF java.desktop -----")
+        // Prepare the current (unnamed) module to use for opens/exports checks
+        val currentModule = this::class.java.module
 
-        LaunchedEffect(Unit) {
-            withContext(Dispatchers.IO) {
-                KCEF.init(
-                        builder = {
-                            installDir(File("kcef-bundle"))
-
-                            progress {
-                                onDownloading {
-                                    println("Downloading KCEF: $it")
-                                    downloading = max(it, 0F)
-                                }
-                                onInitialized { initialized = true }
-                            }
-                            settings {
-                                cachePath = File("cache").absolutePath
-                                windowlessRenderingEnabled = false
-                            }
-
-                            download(download)
-                        },
-                        onError = { it?.printStackTrace() },
-                        onRestartRequired = { restartRequired = true }
+        // 2.5) Module exports/opens for sun.awt
+        runCatching {
+            println(":>> MODULE EXPORTS/OPENS FOR sun.awt by $currentModule")
+            ModuleLayer.boot().modules().sortedBy { it.name }.forEach { mod ->
+                println(
+                        "  ${mod.name.padEnd(30)} opens: ${mod.isOpen("sun.awt", currentModule)} exports: ${mod.isExported("sun.awt", currentModule)}"
                 )
             }
+            println(":>> END MODULE EXPORTS/OPENS FOR sun.awt")
         }
+                .onFailure { it.printStackTrace() }
 
-        if (restartRequired) {
-            Text(text = "Restart required.")
-        } else {
-            if (initialized) {
-                WebView(state, modifier = Modifier.fillMaxSize())
-            } else {
-                Text(text = "Downloading $downloading%")
+        // 3) Module descriptor
+        runCatching {
+            println(">>> MODULE DESCRIPTOR FOR java.awt.Button")
+            val mod = Class.forName("java.awt.Button").module
+            println("Module: ${mod.name}")
+            mod.descriptor.exports().filter { it.source() == "sun.awt" }.forEach {
+                println("export: ${it.source()} -> ${it.targets()}")
             }
         }
+                .onFailure { it.printStackTrace() }
+
+        // 4) AWTAccessor load
+        runCatching {
+            println(">>> LOADING sun.awt.AWTAccessor")
+            val cls = Class.forName("sun.awt.AWTAccessor")
+            println("Loaded in module: ${cls.module.name}")
+        }
+                .onFailure { it.printStackTrace() }
+
+        // 4.5) OS and Java version details
+        runCatching {
+            println(":>> OS AND JAVA VERSION DETAILS")
+            println("os.name:        ${System.getProperty("os.name")}  ")
+            println("java.vm.name:   ${System.getProperty("java.vm.name")}  ")
+            println("java.version:   ${System.getProperty("java.version")}  ")
+            println(":>> END OS AND JAVA VERSION DETAILS")
+        }
+                .onFailure { it.printStackTrace() }
+
+        // 4.6) Module readers of java.desktop
+        runCatching {
+            val javaDesktopModule = Class.forName("java.awt.Component").module
+            println(":>> MODULE READERS OF java.desktop")
+            ModuleLayer.boot().modules().filter { it.canRead(javaDesktopModule) }.forEach {
+                println("  ${it.name}")
+            }
+            println(":>> END MODULE READERS OF java.desktop")
+        }
+                .onFailure { it.printStackTrace() }
+
+        // 5) Coroutines + KCEF.init
+        LaunchedEffect(Unit) {
+            val handler = CoroutineExceptionHandler { _, e ->
+                println(">>> UNHANDLED COROUTINE EXCEPTION")
+                e.printStackTrace()
+            }
+            withContext(Dispatchers.IO + handler) {
+                runCatching {
+                    KCEF.init(
+                            builder = {
+                                installDir(File("kcef-bundle"))
+
+                                progress {
+                                    onDownloading {
+                                        println("Downloading KCEF: $it")
+                                        downloading = max(it, 0F)
+                                    }
+                                    onInitialized { initialized = true }
+                                }
+                                settings {
+                                    cachePath = File("cache").absolutePath
+                                    windowlessRenderingEnabled = false
+                                }
+
+                                download(download)
+                            },
+                            onError = { it?.printStackTrace() },
+                            onRestartRequired = { restartRequired = true }
+                    )
+                }
+                        .onFailure { it.printStackTrace() }
+            }
+        }
+
+        // 6) WebView / UI
+        runCatching {
+            if (restartRequired) {
+                Text(text = "Restart required.")
+            } else {
+                if (initialized) {
+                    WebView(state, modifier = Modifier.fillMaxSize())
+                } else {
+                    Text(text = "Downloading $downloading%")
+                }
+            }
+        }
+                .onFailure { it.printStackTrace() }
 
         DisposableEffect(Unit) { onDispose { KCEF.disposeBlocking() } }
     }
