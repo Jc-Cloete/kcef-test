@@ -49,7 +49,14 @@ compose.desktop {
 
         jvmArgs("--add-opens", "java.desktop/sun.awt=ALL-UNNAMED")
         jvmArgs("--add-opens", "java.desktop/java.awt.peer=ALL-UNNAMED") // recommended but not necessary
+
+        //Just do these indiscriminately instead of checking os name.
         jvmArgs("--add-opens", "java.desktop/sun.lwawt=ALL-UNNAMED")
         jvmArgs("--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED")
+
+//        if (System.getProperty("os.name").contains("Mac")) {
+//            jvmArgs("--add-opens", "java.desktop/sun.lwawt=ALL-UNNAMED")
+//            jvmArgs("--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED")
+//        }
     }
 }
